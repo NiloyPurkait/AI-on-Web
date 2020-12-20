@@ -6,7 +6,7 @@ function App() {
   return (
     <div>
       <header>
-        <div class="overlay">
+        <div className="overlay">
           <h1>Teach me something !</h1>
         </div>
       </header>

@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { render } from "react-dom";
 import Webcam from "react-webcam";
 
 const knnClassifier = require("@tensorflow-models/knn-classifier");
 const mobilenet = require("@tensorflow-models/mobilenet");
 const tf = require("@tensorflow/tfjs");
 
+const classifier = knnClassifier.create();
+
 const buttonData = [
-  { name: "Add A", fn: 0, resetButton: false },
-  { name: "Add B", fn: 1, resetButton: false },
-  { name: "Add C", fn: 2, resetButton: false },
-  { name: "Reset Model", resetButton: true },
+  { name: "Add A", cn: 0, resetButton: false },
+  { name: "Add B", cn: 1, resetButton: false },
+  { name: "Add C", cn: 2, resetButton: false },
+  { name: "Reset Model", cn: 3, resetButton: true },
 ];
 
 const videoConstraints = {
@@ -19,47 +20,13 @@ const videoConstraints = {
   facingMode: "user",
 };
 
-// initialize dict for images
-// Make a list of class names
-const classes = ["A", "B", "C"];
-// Create k nearest neighbors classifier
-const classifier = knnClassifier.create();
-// Get webcam element from html doc
-
-// function UpdateTable({ objD }) {
-//   return (
-//     <table>
-//       <tbody>
-//         {Object.keys(objD).map((key) => {
-//           if (objD.hasOwnProperty(key)) {
-//             if (
-//               objD[key]
-//                 .toString()
-//                 .substring(
-//                   objD[key].toString().indexOf("."),
-//                   objD[key].toString().length
-//                 ) < 2
-//             )
-//               objD[key] += "0";
-//             console.log(key, objD[key]);
-//             return (
-//               <tr>
-//                 <td>{key}</td>
-//                 <td>{objD[key].toString()}</td>
-//               </tr>
-//             );
-//           }
-//         })}
-//       </tbody>
-//     </table>
-//   );
-// }
-
 export default function App() {
-  const [reset, setReset] = useState({});
+  const [reset, setReset] = useState();
   const [net, setNet] = useState();
 
   const webcamRef = useRef(null);
+
+  const classes = ["A", "B", "C"];
 
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current.getScreenshot();
@@ -80,9 +47,18 @@ export default function App() {
     try {
       const model = await mobilenet.load();
       setNet(model);
+      // // Create k nearest neighbors classifier
+      // setClassifier();
     } catch (e) {
       console.log(e);
     }
+  };
+
+  const base64toImg = (baseURL) => {
+    const imgD = new Image(640, 480);
+    imgD.SRC = baseURL;
+
+    return imgD;
   };
 
   // Create an object from Tensorflow.js data API which could capture image
@@ -91,9 +67,7 @@ export default function App() {
   const runPred = async () => {
     while (true) {
       if (classifier.getNumClasses() > 0) {
-        const imgd = new Image(640, 480);
-        imgd.src = capture();
-        const img = tf.browser.fromPixels(imgd);
+        const img = tf.browser.fromPixels(base64toImg(capture()));
 
         // Get the activation from mobilenet from the webcam.
         const activation = net.infer(img, "conv_preds");
@@ -105,8 +79,6 @@ export default function App() {
             prediction: classes[res.label],
             probability: confidence,
           });
-          console.log(reset);
-          console.log(res.label);
         });
 
         // Dispose the tensor to release the memory.
@@ -120,9 +92,11 @@ export default function App() {
   return (
     <main>
       <h2>Loaded TensorFlow.js - version: {tf.version.tfjs}</h2>
-      <div id="console">
-        {Boolean(reset) ? `${reset.prediction} \n ${reset.probability}` : ""}
-      </div>
+      <h2 style={{ color: "white" }}>
+        {Boolean(reset)
+          ? `Prediction: ${reset.prediction} \n Probability: ${reset.probability}`
+          : ""}
+      </h2>
 
       <Webcam
         ref={webcamRef}
@@ -135,20 +109,19 @@ export default function App() {
         return (
           <button
             className="big-button"
-            style={{ display: "block", margin: "5 auto", left: "-180" }}
+            key={b.cn}
+            style={{ display: "block", margin: "5 auto" }}
             onClick={
               b.resetButton
                 ? () => {
                     //clear knn classes
                     classifier.clearAllClasses();
-                    setReset({});
+                    setReset(null);
                   }
                 : () => {
-                    const imgd = new Image(640, 480);
-                    imgd.src = capture();
-                    const img = tf.browser.fromPixels(imgd);
+                    const img = tf.browser.fromPixels(base64toImg(capture()));
                     const activation = net.infer(img, true);
-                    classifier.addExample(activation, b.number);
+                    classifier.addExample(activation, b.cn);
 
                     img.dispose();
                   }
